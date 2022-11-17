@@ -55,7 +55,7 @@ class User extends Authenticatable
      */
     public function loadRelationshipCounts()
     {
-        $this->loadCount(['microposts', 'followings', 'followers']);
+        $this->loadCount(['microposts', 'followings', 'followers', 'favorites']);
     }
     
     /**
@@ -73,6 +73,14 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(User::class, 'user_follow', 'follow_id', 'user_id')->withTimestamps();
     }
+    
+    /**
+     * このユーザが追加したお気に入り一覧 
+     */
+     public function favorites()
+     {
+        return $this->belongsToMany(Micropost::class, 'favorites', 'user_id', 'micropost_id');
+     }
     
     /**
      * $userIdで指定されたユーザをフォローする。
@@ -134,5 +142,50 @@ class User extends Authenticatable
         $userIds[] = $this->id;
         // それらのユーザが所有する投稿に絞り込む
         return Micropost::whereIn('user_id', $userIds);
+    }
+    
+    /**
+     * $micropost_idで指定された投稿内容をお気に入りに追加する。
+     */
+    public function favorite($micropost_id)
+    {
+        // すでにお気に入りに追加しているか
+        $exist = $this->is_favorite($micropost_id);
+
+        if ($exist) {
+            // お気に入りに追加済みの場合は何もしない
+            return false;
+        } else {
+            // 上記以外はお気に入りに追加する
+            $this->favorites()->attach($micropost_id);
+            return true;
+        }
+    }
+
+    /**
+     * $micropost_idで指定された投稿内容をお気に入りから削除する。
+     */
+    public function unfavorite($micropost_id)
+    {
+        // すでにお気に入りに追加しているか
+        $exist = $this->is_favorite($micropost_id);
+
+        if ($exist) {
+            // お気に入りに追加済みの場合はお気に入りから削除する
+            $this->favorites()->detach($micropost_id);
+            return true;
+        } else {
+            // 上記以外の場合は何もしない
+            return false;
+        }
+    }
+
+    /**
+     * 指定された $micropost_idの投稿内容をこのユーザがお気に入りに追加しているか調べる。お気に入りに追加しているならtrueを返す。
+     */
+    public function is_favorite($micropost_id)
+    {
+        // お気に入りに追加している投稿内容の中に $micropost_idのものが存在するか
+        return $this->favorites()->where('micropost_id', $micropost_id)->exists();
     }
 }
